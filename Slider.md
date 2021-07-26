@@ -157,6 +157,8 @@ Status: 200 OK
       "id": 1,
       "title": "title",
       "content": "content",
+      "created_at": 1627290338,
+      "updated_at": 1627290338
     }
     ...
     ...
@@ -181,6 +183,8 @@ Status: 200 OK
         "id": 1,
         "title": "title",
         "content": "content",
+        "created_at": 1627290338,
+        "updated_at": 1627290338
       }
       ...
     ]
@@ -318,7 +322,7 @@ Status: 204 No Content
   // Article model
   type Article struct {
     ID        uint   `json:"id"         gorm:"primaryKey"`
-    UserID  uint   `json:"-"          gorm:"index"`
+    UserID    uint   `json:"-"          gorm:"index"`
     Title     string `json:"title"      gorm:"size:255"`
     Summary   string `json:"summary"    gorm:"size:65535"`
     Content   string `json:"content"    gorm:"size:1048576"`
@@ -332,3 +336,69 @@ Status: 204 No Content
   </div>
 </div>
 
+-----------------------------------------------------------------------
+
+#### List articles
+```
+GET /articles
+```
+
+###### Response
+
+```
+{
+  items: [
+    {
+      "id": 1,
+      "title": "title",
+      "content": "content",
+      "created_at": 1627290338,
+      "updated_at": 1627290338,
+      "author": {
+        "id": "1",
+        "name": "Tom",
+        "title": "CTO",
+        "created_at": 1627290338,
+        "updated_at": 1627290338
+      }
+    }
+    ...
+  ]
+}
+```
+
+-----------------------------------------------------------------------
+
+# 给文章加点评论
+
+### 评论（Comment）模型分析：
+
+<div>
+  <div style="width: 50%; float: left">
+
+  字段描述   | 字段名称      | 字段类型
+  :-------:|:------------:|:--------------
+  评论主键   | id          | integer
+  文章外键   | article_id  | integer
+  评论内容   | content     | string
+  创建时间   | created_at  | unix timestamp
+  更新时间   | updated_at  | unix timestamp
+
+  </div>
+  <div style="width: 50%; float:right; margin-top: 15px">
+
+  ```go
+  // Comment model
+  type Comment struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    ArticleID uint   `json:"article_id" gorm:"index"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
