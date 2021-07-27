@@ -750,8 +750,8 @@ SELECT * FROM photos WHERE album_id = album_id;
   <div style="width: 50%; float:right; margin-top: 15px">
 
   ```go
-  // Comment model
-  type Comment struct {
+  // AlbumComment model
+  type AlbumComment struct {
     ID        uint   `json:"id"         gorm:"primaryKey"`
     AlbumID   uint   `json:"album_id"   gorm:"index"`
     Name      string `json:"name"       gorm:"size:255"`
@@ -788,8 +788,8 @@ SELECT * FROM photos WHERE album_id = album_id;
   <div style="width: 50%; float:right; margin-top: 15px">
 
   ```go
-  // Comment model
-  type Comment struct {
+  // PhotoComment model
+  type PhotoComment struct {
     ID        uint   `json:"id"         gorm:"primaryKey"`
     PhotoID   uint   `json:"photo_id"   gorm:"index"`
     Name      string `json:"name"       gorm:"size:255"`
@@ -807,8 +807,228 @@ SELECT * FROM photos WHERE album_id = album_id;
 
 <div style="text-align:center; padding-top: 55px">
 
-![](./assets/dry.jpeg)
+![DRY](./assets/dry.jpeg)
 
 # DRY ( Don't repeat yourself)
 
 </div>
+
+-----------------------------------------------------------------------
+
+# Refactor Comment Model
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 50%; float: left">
+
+  字段描述   | 字段名称      | 字段类型
+  :-------:|:------------:|:--------------
+  评论主键   | id          | integer
+  归属类型   | owner_type  | string
+  归属外键   | owner_id    | integer
+  评论人名称 | name        | string
+  评论人邮箱 | email       | string
+  评论内容   | content     | string
+  创建时间   | created_at  | unix timestamp
+  更新时间   | updated_at  | unix timestamp
+
+  </div>
+  <div style="width: 50%; float:right; margin-top: 15px">
+
+  ```go
+  type Article struct {
+    ...
+    Comments []*Comment `json:"comments" gorm:"polymorphic:Owner;"`
+  }
+
+  type Album struct {
+    ...
+    Comments []*Comment `json:"comments" gorm:"polymorphic:Owner;"`
+  }
+
+  type Photo struct {
+    ...
+    Comments []*Comment `json:"comments" gorm:"polymorphic:Owner;"`
+  }
+
+  // Comment model
+  type Comment struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    OwnerType string `json:"owner_type" gorm:"index:idx_comment_owner"`
+    OwnerID   uint   `json:"owner_id"   gorm:"index:idx_comment_owner"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Email     string `json:"email"      gorm:"size:255"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  [polymorphic 美 \[pɑli'mɔrfik\] : 多态](https://zh.wikipedia.org/wiki/%E5%A4%9A%E6%80%81_(%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%A7%91%E5%AD%A6))
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+### Database comments table
+
+id | owner_type | owner_id | name      | emai  | content     | created_at | updated_at
+---|------------|----------|-----------|-------|-------------|------------|-----------
+1  | articles   | 1        | Commenter | Email | content ... | 1614309207 | 1614309207
+2  | articles   | 1        | Commenter | Email | content ... | 1614309207 | 1614309207
+3  | album      | 1        | Commenter | Email | content ... | 1614309207 | 1614309207
+4  | album      | 2        | Commenter | Email | content ... | 1614309207 | 1614309207
+5  | photos     | 1        | Commenter | Email | content ... | 1614309207 | 1614309207
+6  | photos     | 2        | Commenter | Email | content ... | 1614309207 | 1614309207
+
+<br />
+
+-----------------------------------------------------------------------
+
+
+
+<div style="margin: 10px 0; border: 1px solid #ccc; border-radius: 6px; overflow: hidden;">
+  <div style="padding: 5px 12px; border: 1px solid rgba(3, 102, 214, 0.2); background: rgb(241, 248, 255)">
+    <strong>Miclle</strong>
+    <span >commented on 2021-07-28 15:00:00</span>
+    <small style="float:right">👍 1k+  👎 1k+</small>
+  </div>
+
+  <div style="padding: 12px;">
+    哇，这个设计好赞，只用了一张表、一个模型就搞定了所有跟评论相关的业务逻辑！<br />
+    多态可以的 👍👍
+  </div>
+
+  <div style="margin: 25px 10px  10px 10px; border: 1px solid #ccc; border-radius: 6px; overflow: hidden;">
+  <div style="padding: 5px 12px; border: 1px solid rgba(3, 102, 214, 0.2); background: rgb(241, 248, 255)">
+    <strong>Miclle's Master</strong>
+    <span >commented on 2021-07-28 15:01:00</span>
+    <small style="float:right">👍 500+  👎 500k+</small>
+  </div>
+
+  <div style="padding: 12px;">
+  不见得吧，这种设计会让 <code>comments</code> 的数据量膨胀得特别快，MySQL 单表千万甚至百万就会有性能问题了，本地玩玩 '10ms'，一到线上 '1000ms' 妥妥的；<br />
+  应该考虑按业务、按日期分库、拆表
+  </div>
+
+  <div style="margin: 25px 10px  10px 10px; border: 1px solid #ccc; border-radius: 6px; overflow: hidden;">
+  <div style="padding: 5px 12px; border: 1px solid rgba(3, 102, 214, 0.2); background: rgb(241, 248, 255)">
+    <strong>Master's Master</strong>
+    <span>commented on 2021-07-28 15:02:00</span>
+    <small style="float:right">👍 666+</small>
+  </div>
+
+  <div style="padding: 12px; height: auto; overflow: hidden;">
+  <span style="float:left; width: 66%">
+  架构设计从来没有 “一招鲜，吃遍天”，没有最牛逼的设计，只有最适合的设计，着重考虑好当下，预留好扩展接口。<br /><br />
+  <strong>“过早优化是万恶之源”——克努特优化原则 (Knuth's optimization principle)</strong>。
+  </span>
+
+  <span style="float:right; width: 30%">
+    <img
+      style="width: 100%;"
+      src="./assets/premature-optimization-is-the-root-of-all.jpeg" alt="premature optimization is the root of all"
+    />
+  </span>
+  </div>
+  </div>
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+# 百亿千亿级别的数据量该如何设计?
+
+<div style="height:auto; overflow: hidden;">
+
+<img style="width: 38%; float: left" src="./assets/yaoming.jpg" />
+
+<div style="width: 60%; float: right; padding-top: 400px; font-size: 32px">
+
+> 别问我，我还没遇到过！😂
+也许 Miclle's Master 说的是对的
+
+</div>
+
+<div>
+
+-----------------------------------------------------------------------
+
+<div style="text-align: center; margin-top: 200px">
+
+## 聪明的同学可能发现了，上面的评论竟然还是套圈的
+
+<br/>
+
+## 这个模型要怎么设计呢？
+
+</div>
+
+-----------------------------------------------------------------------
+
+# So easy，加个字段嘛
+
+### 那个 “套圈” 其实就是一个 “树” (tree)
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 30%; float:left; background: #fff;">
+
+- comment 1
+  - comment 3
+  - comment 4
+- comment 2
+  - comment 7
+    - comment 8
+- comment 5
+- comment 9
+  </div>
+  <div style="width: 68%; float: right">
+
+  ```go
+  type Comment struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    OwnerType string `json:"owner_type" gorm:"index:idx_comment_owner"`
+    OwnerID   uint   `json:"owner_id"   gorm:"index:idx_comment_owner"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Email     string `json:"email"      gorm:"size:255"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+
+    ParentID  uint `json:"parent_id" gorm:"index"`
+  }
+  ```
+
+  </div>
+</div>
+
+##### 套圈 comments 是最最简单的 tree <br /> 复杂的 tree 如： 文件系统目录、 Confluence 文档目录，支持移动、排序...
+
+-----------------------------------------------------------------------
+
+### 据说这个模型比较高级： [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 55%; float: left">
+
+Node          | Left | Right | Depth
+--------------|-----:|------:|------:
+Clothing      | 1    | 22    | 0
+Men's         | 2    | 9     | 1
+Women's       | 10   | 21    | 1
+Suits         | 3    | 8     | 2
+Slacks        | 4    | 5     | 3
+Jackets       | 6    | 7     | 3
+Dresses       | 11   | 16    | 2
+Skirts        | 17   | 18    | 2
+Blouses       | 19   | 20    | 2
+Evening Gowns | 12   | 13    | 3
+Sun Dresses   | 14   | 15    | 3
+
+  </div>
+  <div style="width: 38%; float:left;">
+  <img style="width: 100%;" src="./assets/nested_set_model.png" />
+  <img style="width: 100%;" src="./assets/nested_set_model_tree.png" />
+  </div>
+</div>
+
+-----------------------------------------------------------------------
