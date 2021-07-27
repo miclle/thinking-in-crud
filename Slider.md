@@ -354,7 +354,7 @@ for article, _ := range article {
 
 ###### <span style="color:green">Good case</span>
 
-```GO
+```go
 database.Preload("Author").Find(&articles)
 ```
 
@@ -587,7 +587,7 @@ database.Model(&comment).Where("article_id = ?", articleID).Update("content", "n
 GET /articles
 ```
 
-```GO
+```go
 database.Preload("Author").Find(&articles)
 ```
 
@@ -655,7 +655,7 @@ database.Preload("Author").Find(&articles)
 
 ###### <span style="color:green">Good case</span>
 
-```GO
+```go
 database.Preload("Author", func(db *gorm.DB) *gorm.DB {
   return db.Select([]string{"name", "title"}) // Limit SQL query columns
 }).Find(&articles)
@@ -717,7 +717,7 @@ type User struct {
   </div>
 </div>
 
-```GO
+```go
 database.Preload("Owner").Preload("Photos").First(&album, "id = ?", 1)
 ```
 
@@ -1031,4 +1031,152 @@ Sun Dresses   | 14   | 15    | 3
   </div>
 </div>
 
+-----------------------------------------------------------------------
+
+# 给 Blog 再加一点新功能，比如：打标签
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 45%; float: left; margin-right: 5px;">
+
+  ```go
+  type Article struct {
+    ...
+    Tags []string `json:"tags" gorm:"type:json"`
+  }
+
+  type Album struct {
+    ...
+    Tags []string `json:"tags" gorm:"type:json"`
+  }
+
+  type Photo struct {
+    ...
+    Tags []string `json:"tags" gorm:"type:json"`
+  }
+  ```
+
+  </div>
+  <div style="width:3%; float: left; margin-top: 150px; text-align: center;">
+
+  *vs*
+
+  </div>
+  <div style="width: 51%; float:right; margin-left: 5px;">
+
+  ```go
+  type Article struct {
+    ...
+    Tags []*Tag `json:"tag"`
+  }
+
+  type Album struct {
+    ...
+    Tags []*Tag `json:"tag"`
+  }
+
+  type Photo struct {
+    ...
+    Tags []*Tag `json:"tag"`
+  }
+
+  // Tag model
+  type Tag struct {
+    ID           uint   `json:"id"         gorm:"primaryKey"`
+    Name         string `json:"name"       gorm:"uniqueIndex:idx_tag"`
+    OwnerType    string `json:"owner_type" gorm:"uniqueIndex:idx_tag"`
+    OwnerID      uint   `json:"owner_id"   gorm:"uniqueIndex:idx_tag"`
+    CreatedAt    int64  `json:"created_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+### 冗余再少一点
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 27%; float: left; margin-right: 5px;">
+
+  ```go
+  type Article struct {
+    ...
+    Taggings []*Tagging `json:"-"`
+    Tags     []*Tag     `json:"tags"`
+  }
+
+  type Album struct {
+    ...
+    Taggings []*Tagging `json:"-"`
+    Tags     []*Tag     `json:"tags"`
+  }
+
+  type Photo struct {
+    ...
+    Taggings []*Tagging `json:"-"`
+    Tags     []*Tag     `json:"tags"`
+  }
+  ```
+
+  </div>
+  <div style="width: 72%; float:right; margin-left: 5px;">
+
+  ```go
+  type Tag struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    Name      string `json:"name"       gorm:"size:128;uniqueIndex"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+
+  type Tagging struct {
+    ID           uint   `json:"id"            gorm:"primaryKey"`
+    TaggableType string `json:"taggable_type" gorm:"uniqueIndex:idx_taggings_taggable"`
+    TaggableID   uint   `json:"taggable_id"   gorm:"uniqueIndex:idx_taggings_taggable"`
+    TagID        uint   `json:"tag_id"        gorm:"uniqueIndex:idx_taggings_taggable"`
+    CreatedAt    int64  `json:"created_at"`
+    Tag          *Tag
+  }
+  ```
+
+  </div>
+</div>
+
+```go
+database.Preload("Taggings").Preload("Taggings.Tag").Find(&articles)
+```
+
+-----------------------------------------------------------------------
+
+
+### 读多写少，应该冗余
+
+```go
+type Article struct {
+  ...
+  Taggings []*Tagging `json:"-"`
+  Tags     []string   `json:"tags" gorm:"type:json"`
+}
+
+```
+
+```go
+// nested preloading
+database.Preload("Taggings").Preload("Taggings.Tag").Find(&articles)
+
+// AfterSave is a callback after the update operation
+func (article *Article) AfterSave(tx *gorm.DB) (err error) {
+
+  var tags []string
+
+  for tagging, _ := range article.Taggings {
+    tags = append(tags, tagging.Tag.Name)
+  }
+
+  article.Tags = tags
+
+  return
+}
+```
 -----------------------------------------------------------------------
