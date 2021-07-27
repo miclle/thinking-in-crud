@@ -675,3 +675,140 @@ type User struct {
 
 ```
 
+-----------------------------------------------------------------------
+
+# 给 Blog 增加一点新功能，比如：加一个相册功能
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 49%; float: left; margin-right: 5px;">
+
+  ```go
+  // Album model
+  type Album struct {
+    ID          uint   `json:"id"           gorm:"primaryKey"`
+    UserID      uint   `json:"user_id"      gorm:"index"`
+    Title       string `json:"title"        gorm:"size:255"`
+    Summary     string `json:"summary"      gorm:"size:65535"`
+    CreatedAt   int64  `json:"created_at"`
+    UpdatedAt   int64  `json:"updated_at"`
+
+    Owner *User     `json:"author,omitempty" gorm:"foreignKey:UserID"`
+    Photos []*Photo `json:"photos,omitempty"`
+  }
+  ```
+  </div>
+
+  <div style="width: 49%; float:right; margin-left: 5px;">
+
+  ```go
+  // Photo model
+  type Photo struct {
+    ID        uint   `json:"id"       gorm:"primaryKey"`
+    AlbumID   uint   `json:"album_id" gorm:"index"`
+    Name      string `json:"name"     gorm:"size:255"` // Original file name
+    Key       string `json:"-"        gorm:"size:255"` // File storage key
+    Hash      string `json:"-"        gorm:"size:128"` // File content hash
+    Meta      string `json:"meta"     gorm:"type:json"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+```GO
+database.Preload("Owner").Preload("Photos").First(&album, "id = ?", 1)
+```
+
+```sql
+SELECT * FROM albums WHERE id = 1;
+SELECT * FROM users WHERE id = user_id;
+SELECT * FROM photos WHERE album_id = album_id;
+```
+
+-----------------------------------------------------------------------
+
+# 给相册加点评论
+
+### 相册评论（AlbumComment）模型分析：
+
+<div>
+  <div style="width: 50%; float: left">
+
+  字段描述   | 字段名称      | 字段类型
+  :-------:|:------------:|:--------------
+  评论主键   | id          | integer
+  相册外键   | album_id    | integer
+  评论人名称 | name        | string
+  评论人邮箱 | email       | string
+  评论内容   | content     | string
+  创建时间   | created_at  | unix timestamp
+  更新时间   | updated_at  | unix timestamp
+
+  </div>
+  <div style="width: 50%; float:right; margin-top: 15px">
+
+  ```go
+  // Comment model
+  type Comment struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    AlbumID   uint   `json:"album_id"   gorm:"index"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Email     string `json:"email"      gorm:"size:255"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+# 呃，其实相册的照片也需要评论
+
+### 照片评论（PhotoComment）模型分析：
+
+<div>
+  <div style="width: 50%; float: left">
+
+  字段描述   | 字段名称      | 字段类型
+  :-------:|:------------:|:--------------
+  评论主键   | id          | integer
+  照片外键   | photo_id    | integer
+  评论人名称 | name        | string
+  评论人邮箱 | email       | string
+  评论内容   | content     | string
+  创建时间   | created_at  | unix timestamp
+  更新时间   | updated_at  | unix timestamp
+
+  </div>
+  <div style="width: 50%; float:right; margin-top: 15px">
+
+  ```go
+  // Comment model
+  type Comment struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    PhotoID   uint   `json:"photo_id"   gorm:"index"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Email     string `json:"email"      gorm:"size:255"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 55px">
+
+![](./assets/dry.jpeg)
+
+# DRY ( Don't repeat yourself)
+
+</div>
