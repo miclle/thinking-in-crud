@@ -281,7 +281,7 @@ Status: 204 No Content
 
 #### 加两个字段还是加个模型？
 
-<div>
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
   <div style="width: 48%; float: left; margin-right: 5px;">
 
   ```go
@@ -297,7 +297,6 @@ Status: 204 No Content
     UpdatedAt   int64  `json:"updated_at"`
   }
   ```
-
   </div>
 
   <div style="width:3%; float: left; margin-top: 100px; text-align: center;">
@@ -329,8 +328,57 @@ Status: 204 No Content
     CreatedAt int64  `json:"created_at"`
     UpdatedAt int64  `json:"updated_at"`
 
-    Author *User `json:"author" gorm:"foreignKey:UserID"`
+    Author *User `json:"author,omitempty" gorm:"foreignKey:UserID"`
   }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+# What is N+1 query?
+
+#### List articles:
+
+###### <span style="color:orange">Bad case</span>
+
+```go
+articles, err := database.Find(&articles)
+// SELECT * FROM articles;
+
+for article, _ := range article {
+  article.Author, err := database.First(&article.UserID) // N+1 query
+  // SELECT * FROM users WHERE id = ? LIMIT 1;
+}
+```
+
+###### <span style="color:green">Good case</span>
+
+```GO
+database.Preload("Author").Find(&articles)
+```
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 48%; float: left; margin-right: 5px;">
+
+  ```sql
+  SELECT * FROM articles
+  LEFT JOIN users ON users.id = articles.user_id;
+  ```
+
+  </div>
+
+  <div style="width:3%; float: left; text-align: center;">
+
+  *vs*
+
+  </div>
+
+  <div style="width: 48%; float:right; margin-left: 5px;">
+
+  ```sql
+  SELECT * FROM articles
+  SELECT * FROM users WHERE id IN (...)
   ```
 
   </div>
@@ -356,8 +404,8 @@ GET /articles
       "updated_at": 1627290338,
       "author": {
         "id": "1",
-        "name": "Tom",
-        "title": "CTO",
+        "name": "Author Name",
+        "title": "Author Title",
         "created_at": 1627290338,
         "updated_at": 1627290338
       }
@@ -366,6 +414,49 @@ GET /articles
   ]
 }
 ```
+
+-----------------------------------------------------------------------
+
+#### 这样处理是不是也可以？有什么好处？
+
+<div>
+  <div style="width: 48%; float: left; margin-right: 5px;">
+
+  ```go
+  // Article model
+  type Article struct {
+    ID          uint   `json:"id"           gorm:"primaryKey"`
+    UserID      uint   `json:"-"            gorm:"index"`
+    Title       string `json:"title"        gorm:"size:255"`
+    AuthorName  string `json:"author_name"  gorm:"size:255"`
+    AuthorTitle string `json:"author_title" gorm:"size:255"`
+    Summary     string `json:"summary"      gorm:"size:65535"`
+    Content     string `json:"content"      gorm:"size:1048576"`
+    CreatedAt   int64  `json:"created_at"`
+    UpdatedAt   int64  `json:"updated_at"`
+
+    Author *User `json:"author,omitempty" gorm:"foreignKey:UserID"`
+  }
+  ```
+
+  </div>
+
+  <div style="width: 48%; float:right; margin-left: 5px;">
+
+  ```go
+  // User model
+  type User struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Title     string `json:"title"      gorm:"size:255"`
+    Bio       string `json:"bio"        gorm:"size:65535"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
 
 -----------------------------------------------------------------------
 
@@ -380,6 +471,8 @@ GET /articles
   :-------:|:------------:|:--------------
   评论主键   | id          | integer
   文章外键   | article_id  | integer
+  评论人名称 | name        | string
+  评论人邮箱 | email       | string
   评论内容   | content     | string
   创建时间   | created_at  | unix timestamp
   更新时间   | updated_at  | unix timestamp
@@ -392,6 +485,8 @@ GET /articles
   type Comment struct {
     ID        uint   `json:"id"         gorm:"primaryKey"`
     ArticleID uint   `json:"article_id" gorm:"index"`
+    Name      string `json:"name"       gorm:"size:255"`
+    Email     string `json:"email"       gorm:"size:255"`
     Content   string `json:"content"    gorm:"size:1048576"`
     CreatedAt int64  `json:"created_at"`
     UpdatedAt int64  `json:"updated_at"`
@@ -402,3 +497,181 @@ GET /articles
 </div>
 
 -----------------------------------------------------------------------
+
+### 评论接口设计（RESTful）
+
+功能描述 |  RESTful APIs (HTTP) | URL
+:------:|:--------------------:|--------------
+创建评论 |  POST                | /articles/:id/comments
+评论列表 |  GET                 | /articles/:id/comments
+更新评论 |  PUT / PATCH         | /articles/:id/comments/:comment_id
+删除评论 |  DELETE              | /articles/:id/comments/:comment_id
+
+-----------------------------------------------------------------------
+
+# RESTful 架构风格下的常见安全问题
+
+## 遗漏了对资源从属关系的检查
+一个典型的 RESTful 的 URL 会用资源名加上资源的 ID 编号来标识其唯一性，就像这样 /articles/:id，/articles/:id/comments/:comment_id 例如：
+`/articles/1`, `/articles/1/comments/123`
+
+###### 创建文章评论
+```go
+comment := &Comment{ ... }
+comment.ArticleID = 1
+database.Create(comment)
+// INSERT INTO `comments` (`article_id`,`name`,`email`,`content`,`created_at`) VALUES (1,"Name","email@domain.com","content...",1627290338);
+```
+
+###### 文章评论列表
+```go
+var comments []Comment
+database.Where("article_id = ?", 1).Find(&comments)
+// SELECT * FROM comments WHERE article_id = 1;
+```
+
+-----------------------------------------------------------------------
+
+###### 更新文章评论
+
+`/articles/1/comments/123`
+`/articles/2/comments/456`
+
+```go
+// params binding...
+
+var (
+  articleID = params.Get("id")
+  comment   = Comment{
+    ID: params.Get("comment_id"),
+  }
+)
+```
+
+###### <span style="color:red">Big bug</span>
+
+```go
+database.Model(&comment).Update("content", "new content...")
+// UPDATE comments SET content='new content...', updated_at=1627290338 WHERE id=123;
+// maybe article_id = 2
+```
+
+###### <span style="color:green">Must limit</span>
+```go
+database.Model(&comment).Where("article_id = ?", articleID).Update("content", "new content...")
+// UPDATE comments SET content='new content...', updated_at=1627290338 WHERE id=123 AND article_id = 1;
+```
+
+-----------------------------------------------------------------------
+
+## 数字自增 ID 会泄露业务信息
+
+`/articles/1`
+`/articles/2`
+`/articles/3`
+`/articles/4`
+...
+`/articles/1/comments/1`
+`/articles/1/comments/2`
+...
+
+资源 ID 是 RESTful URL 中很重要的一个组成部分，大多数情况下这类资源ID都是用数字来表示的。这在不经意间泄露了业务信息，而这些信息可能正是竞争对手希望得到的数据
+
+解决办法是不使用按序递增的数字作为 ID，或使用具有随机性、唯一性、不可预测性的值作为 ID，如 UUID
+
+-----------------------------------------------------------------------
+
+## 其它安全问题，返回多余的数据
+
+```
+GET /articles
+```
+
+```GO
+database.Preload("Author").Find(&articles)
+```
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 49%; float: left; margin-right: 5px;">
+
+  ```go
+  // User model
+  type User struct {
+    ID                uint   `json:"id"                 gorm:"primaryKey"`
+    Name              string `json:"name"               gorm:"size:255"`
+    Title             string `json:"title"              gorm:"size:255"`
+    Bio               string `json:"bio"                gorm:"size:65535"`
+    EncryptedPassword []byte `json:"encrypted_password" gorm:"default:NULL"`
+    CreatedAt         int64  `json:"created_at"`
+    UpdatedAt         int64  `json:"updated_at"`
+  }
+
+  // Article model
+  type Article struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    UserID    uint   `json:"-"          gorm:"index"`
+    Title     string `json:"title"      gorm:"size:255"`
+    Summary   string `json:"summary"    gorm:"size:65535"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+
+    Author *User `json:"author,omitempty" gorm:"foreignKey:UserID"`
+  }
+  ```
+
+  </div>
+
+  <div style="width: 49%; float:right; margin-left: 5px;">
+
+  ```
+  {
+    items: [
+      {
+        "id": 1,
+        "title": "title",
+        "content": "content",
+        "created_at": 1627290338,
+        "updated_at": 1627290338,
+        "author": {
+          "id": "1",
+          "name": "Author Name",
+          "title": "Author Title",
+          "bio": "Author bio content"
+          "encrypted_password": "$2a$10$Jpd.qN7rzAQHV8uv..."
+          "created_at": 1627290338,
+          "updated_at": 1627290338
+        }
+      }
+      ...
+    ]
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+###### <span style="color:green">Good case</span>
+
+```GO
+database.Preload("Author", func(db *gorm.DB) *gorm.DB {
+  return db.Select([]string{"name", "title"}) // Limit SQL query columns
+}).Find(&articles)
+```
+
+```go
+// User model
+type User struct {
+  ID                uint   `json:"id"          gorm:"primaryKey"`
+  Name              string `json:"name"        gorm:"size:255"`
+  Title             string `json:"title"       gorm:"size:255"`
+  Bio               string `json:"bio"         gorm:"size:65535"`
+  EncryptedPassword []byte `json:"-"           gorm:"default:NULL"` // ignore json Marshal
+  CreatedAt         int64  `json:"created_at"`
+  UpdatedAt         int64  `json:"updated_at"`
+}
+
+```
+
