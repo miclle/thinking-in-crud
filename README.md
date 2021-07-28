@@ -1,1 +1,1 @@
-# Thinging in CRUD
+# Thinking in CRUD
