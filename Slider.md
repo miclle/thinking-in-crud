@@ -32,9 +32,9 @@ Miclle Zheng
 CRUD     | Databases (SQL)   | MongoDB  | RESTful APIs (HTTP)
 :-------:|:-----------------:|:--------:|:--------------------:
 Create   | INSERT            | Insert   | POST
-Read     | SELECT            | Remove   | GET
-Update   | UPDATE            | Find     | PUT / PATCH
-Delete   | DELETE            | Update   | DELETE
+Read     | SELECT            | Find     | GET
+Update   | UPDATE            | Update   | PUT / PATCH
+Delete   | DELETE            | Remove   | DELETE
 
 -----------------------------------------------------------------------
 
