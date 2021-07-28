@@ -1452,12 +1452,11 @@ UPDATE articles SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHER
 ###### 但是，如果请求变成了这样：
 
 `PATCH /articles/123%20or%201%3D1` => `PATCH /articles/123 or 1=1`
-
 <small>此时 params["id"] 值为： id=123 or 1 = 1，拼接的 SQL 为：</small>
 ```sql
 UPDATE articles SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123 or 1 = 1;
--- 所有文章的 title 都变成了 🤖🤖🤖🤖🤖🤖
 ```
+<small style="display: block; margin-top: -30px">完了，所有文章的 title 都变成了 “🤖🤖🤖🤖🤖🤖”， 可以卷铺盖走人了</small>
 
 ###### <span style="color:green">Good case</span>
 
@@ -1465,7 +1464,7 @@ UPDATE articles SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHER
 database.Model(&comment).Where("id = ?", params["id"]).Update("title", "🤖🤖🤖🤖🤖🤖")
 ```
 
-###### 使用参数占位符，内容会被转义
+<small style="display: block; margin-top: -30px">使用参数占位符，内容会被转义</small>
 
 -----------------------------------------------------------------------
 
