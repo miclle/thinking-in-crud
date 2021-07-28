@@ -936,7 +936,7 @@ id | owner_type | owner_id | name      | emai  | content     | created_at | upda
 
 -----------------------------------------------------------------------
 
-# 百亿千亿级别的数据量该如何设计?
+# 那么问题来了，百亿千亿级别的数据量该如何设计?
 
 <div style="height:auto; overflow: hidden;">
 
@@ -1005,35 +1005,115 @@ id | owner_type | owner_id | name      | emai  | content     | created_at | upda
 
 -----------------------------------------------------------------------
 
-### 据说这个模型比较高级： [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
+###### 据说这个模型比较高级： [Nested set model](https://en.wikipedia.org/wiki/Nested_set_model)
 
 <div style="display: block; width: 100%; height: auto; overflow: hidden">
   <div style="width: 55%; float: left">
 
-Node          | Left | Right | Depth
---------------|-----:|------:|------:
-Clothing      | 1    | 22    | 0
-Men's         | 2    | 9     | 1
-Women's       | 10   | 21    | 1
-Suits         | 3    | 8     | 2
-Slacks        | 4    | 5     | 3
-Jackets       | 6    | 7     | 3
-Dresses       | 11   | 16    | 2
-Skirts        | 17   | 18    | 2
-Blouses       | 19   | 20    | 2
-Evening Gowns | 12   | 13    | 3
-Sun Dresses   | 14   | 15    | 3
+  Node          | Left | Right | Depth
+  --------------|-----:|------:|------:
+  Clothing      | 1    | 22    | 0
+  Men's         | 2    | 9     | 1
+  Women's       | 10   | 21    | 1
+  Suits         | 3    | 8     | 2
+  Slacks        | 4    | 5     | 3
+  Jackets       | 6    | 7     | 3
+  Dresses       | 11   | 16    | 2
+  Skirts        | 17   | 18    | 2
+  Blouses       | 19   | 20    | 2
+  Evening Gowns | 12   | 13    | 3
+  Sun Dresses   | 14   | 15    | 3
 
   </div>
-  <div style="width: 38%; float:left;">
-  <img style="width: 100%;" src="./assets/nested_set_model.png" />
-  <img style="width: 100%;" src="./assets/nested_set_model_tree.png" />
+  <div style="width: 38%; float:right; margin-right: 45px">
+    <img style="width: 100%;" src="./assets/nested_set_model.png" />
+    <img style="width: 100%;" src="./assets/nested_set_model_tree.png" />
   </div>
 </div>
 
 -----------------------------------------------------------------------
 
+```sql
+SELECT `node`, `depth` FROM `nested_set` ORDER BY `left` ASC, `right` ASC
+```
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 43%; float: left">
+
+  Node          | Left | Right | Depth
+  --------------|-----:|------:|------:
+  Clothing      | 1    | 22    | 0
+  Men's         | 2    | 9     | 1
+  Women's       | 10   | 21    | 1
+  Suits         | 3    | 8     | 2
+  Slacks        | 4    | 5     | 3
+  Jackets       | 6    | 7     | 3
+  Dresses       | 11   | 16    | 2
+  Skirts        | 17   | 18    | 2
+  Blouses       | 19   | 20    | 2
+  Evening Gowns | 12   | 13    | 3
+  Sun Dresses   | 14   | 15    | 3
+
+  </div>
+  <div style="width: 28%; float:left;">
+
+  Node          | Depth
+  --------------|------:
+  Clothing	    | 0
+  Men's	        | 1
+  Suits	        | 2
+  Slacks	      | 3
+  Jackets	      | 3
+  Women's	      | 1
+  Dresses	      | 2
+  Evening Gowns	| 3
+  Sun Dresses	  | 3
+  Skirts	      | 2
+  Blouses	      | 2
+
+  </div>
+
+  <div style="width: 28%; float:left; padding-top: 55px; line-height: 39px; position: relative;">
+
+  - Clothing
+    - Men's
+      - Suits
+        - Slacks
+        - Jackets
+    - Women's
+      - Dresses
+        - Evening...
+        - Sun Dresses
+      - Skirts
+      - Blouses
+
+  <div style="position: absolute; border-left: 1px dashed #999; width: 1px; font-size: 22px; text-indent: -6px; top: 35px; left: 19px; bottom: 20px">0</div>
+  <div style="position: absolute; border-left: 1px dashed #999; width: 1px; font-size: 22px; text-indent: -6px; top: 35px; left: 59px; bottom: 20px">1</div>
+  <div style="position: absolute; border-left: 1px dashed #999; width: 1px; font-size: 22px; text-indent: -6px; top: 35px; left: 99px; bottom: 20px">2</div>
+  <div style="position: absolute; border-left: 1px dashed #999; width: 1px; font-size: 22px; text-indent: -6px; top: 35px; left: 139px; bottom: 20px">3</div>
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+### ParentID *vs* Nested set model
+
+###### ParentID：
+- 实现相对简单
+- 大多数数据库不支持直接查询输出成树形结构，构建树的过程不过避免的需要在逻辑代码中递归
+- 节点没有排序，排序需要额外增加 sort 字段
+- 对于节点移动，需要更新所有一级子节点的 ParentID，如果有排序，还需要重新调整 sort 字段值
+
+###### Nested set model：
+- 实现复杂
+- 直接通过对 left, right 的排序，然后使用 depth 设置节点深度，即可构建树形结构
+- 对于节点移动，需要重新计算当前节点、同级节点、以及所有子孙节点的 left, right, depth 并更新
+
+-----------------------------------------------------------------------
+
 # 给 Blog 再加一点新功能，比如：打标签
+
+### 两种实现：
 
 <div style="display: block; width: 100%; height: auto; overflow: hidden">
   <div style="width: 45%; float: left; margin-right: 5px;">
@@ -1180,3 +1260,244 @@ func (article *Article) AfterSave(tx *gorm.DB) (err error) {
 }
 ```
 -----------------------------------------------------------------------
+
+# 这个 Blog 功能要再强大一点，加个注册和登录吧
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 27%; float: left; margin-right: 5px;">
+
+  ###### Signup:
+
+  <form style="border: 1px solid #CCC; margin-top: 15px; padding: 10px">
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputName">Username:</label>
+      <input type="email" class="form-control" id="exampleInputName">
+    </div>
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputEmail">Email:</label>
+      <input type="email" class="form-control" id="exampleInputEmail">
+    </div>
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputPassword1">Password:</label>
+      <input type="password" class="form-control" id="exampleInputPassword1">
+    </div>
+    <button type="submit" style="margin-left: 153px">Signup</button>
+  </form>
+
+  ###### Login:
+
+  <form style="border: 1px solid #CCC; margin-top: 15px; padding: 10px">
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputEmail">Email:</label>
+      <input type="email" class="form-control" id="exampleInputEmail">
+    </div>
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputPassword1">Password:</label>
+      <input type="password" class="form-control" id="exampleInputPassword1">
+    </div>
+    <button type="submit" style="margin-left: 153px">Login</button>
+  </form>
+
+
+  </div>
+  <div style="width: 72%; float:right; margin-left: 5px;">
+
+  ###### 给 User 模型加两个字段：
+
+  ```go
+  // User model
+  type User struct {
+    ID                uint   `json:"id"         gorm:"primaryKey"`
+    Name              string `json:"name"       gorm:"size:255"`
+    Username          string `json:"username"   gorm:"uniqueIndex"`
+    Email             string `json:"email"      gorm:"size:255;uniqueIndex"`
+    EncryptedPassword []byte `json:"-"          gorm:"default:NULL"`
+    Title             string `json:"title"      gorm:"size:255"`
+    Bio               string `json:"bio"        gorm:"size:65535"`
+    CreatedAt         int64  `json:"created_at"`
+    UpdatedAt         int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+### 如何处理密码？
+
+- 肯定不能像 CSDN 那样明文保存 😂
+- MD5 怎么样？把用户密码 MD5 后保存起来，然后登录验证的时候 MD5 后看跟库里的是不是一样...
+别想了 2004 年，已经证实 MD5 算法无法防止碰撞攻击，网上有各种 MD5 反向查询服务 🙅
+- 密码加盐: MD5(password + salt) 呢？要是被扒库了加十斤盐都不管用
+
+###### 推荐使用 bcrypt 加密算法 <small>https://en.wikipedia.org/wiki/Bcrypt</small>
+
+```go
+type User struct {
+  Username          string `json:"username" gorm:"uniqueIndex"`
+  Email             string `json:"email"    gorm:"uniqueIndex"`
+  Password          string `json:"-"        gorm:"-"                    validate:"required,min=8,max=56"`
+  EncryptedPassword []byte `json:"-"        gorm:"default:NULL"`
+}
+
+// BeforeCreate gorm before create callback
+func (user *User) BeforeCreate(tx *gorm.DB) (err error) {
+  user.EncryptedPassword, err = bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+  tx.AddError(err)
+  return
+}
+```
+
+-----------------------------------------------------------------------
+
+### 如何验证 Email
+
+```go
+type User struct {
+  Username          string `json:"username" gorm:"uniqueIndex"`
+  Email             string `json:"email"    gorm:"uniqueIndex:idx_email_confirmed"`
+  VerifyToken       string `json:"-"        gorm:"uniqueIndex"`
+  Verified          bool   `json:"verified" gorm:"uniqueIndex:idx_email_confirmed;default:NULL;"`
+  Password          string `json:"-"        gorm:"-"                    validate:"required,min=8,max=56"`
+  EncryptedPassword []byte `json:"-"        gorm:"default:NULL"`
+}
+```
+
+1. 创建用户时生成 `VerifyToken` 如：
+8uvBPv1hjUP6LE4OBGvY67HCOIog46
+2. 创建用户成功后发送验证链接，如：
+https://domain.com/email/verify/8uvBPv1hjUP6LE4OBGvY67HCOIog46
+3. 用户点击链接，发送验证请求
+4. 收到请求、查询 token 是否存在，判断是否验证成功
+
+###### 看上去好像没毛病，需求搞定了 😂
+
+-----------------------------------------------------------------------
+
+#### 如果多考虑一些问题：
+
+1. `VerifyToken` 的时效性如何保证？加个 `VerifyTokenSendAt` 字段记录发送时间？
+2. 如何防止验证链接被第三人获取？ 发送的邮件在邮件服务商都有保存副本，如何防止 Facebook 那样的内鬼？
+
+#### 我想到的一些办法：
+1. `VerifyToken` 使用 [UDID](github.com/oklog/ulid/) 生成带时间的 token，减少一个冗余字段;
+2. 验证链接需要登录； `VerifyToken` 本来就是和用户绑定的，且第三人无法知道用户密码从而无法伪造和社工；
+*PS.: GitHub 就是这么做的*
+3. 验证后的邮箱在网站顶栏做相应提示，比如一直提示 72 小时，告知用户有邮箱被添加;
+*PS.: Gmail 就是这么做的*
+
+<br />
+<h6 style="text-align: center">是过度设计，还是想太多 😂</h6>
+
+-----------------------------------------------------------------------
+
+# SQL 注入（老生常谈的问题了）
+
+#### 先举个例子
+
+<div style="display: block; width: 100%; height: auto; overflow: hidden">
+  <div style="width: 27%; float: left; margin-right: 5px;">
+
+  ###### Update article:
+
+  <form style="border: 1px solid #CCC; margin-top: 15px; padding: 10px">
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputName">Title:</label>
+      <input type="email" class="form-control" id="exampleInputName">
+    </div>
+    <div class="mb-3">
+      <label style="display:inline-block; width: 145px; text-align: right" for="exampleInputEmail">Content:</label>
+      <input type="email" class="form-control" id="exampleInputEmail">
+    </div>
+    <button type="submit" style="margin-left: 153px">Submit</button>
+  </form>
+
+  </div>
+  <div style="width: 72%; float:right; margin-left: 5px;">
+
+  ###### Article Model：
+
+  ```go
+  // Article model
+  type Article struct {
+    ID        uint   `json:"id"         gorm:"primaryKey"`
+    Title     string `json:"title"      gorm:"size:255"`
+    Content   string `json:"content"    gorm:"size:1048576"`
+    CreatedAt int64  `json:"created_at"`
+    UpdatedAt int64  `json:"updated_at"`
+  }
+  ```
+
+  </div>
+</div>
+
+-----------------------------------------------------------------------
+
+`PATCH /articles/123`
+
+###### <span style="color:red">Big bug</span>
+
+```go
+database.Model(&comment).Where(fmt.Sprintf("id = %s", params["id"])).Update("title", "🤖🤖🤖🤖🤖🤖")
+```
+
+###### 预期执行：
+```sql
+UPDATE users SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123;
+```
+
+###### Why?
+
+如果请求变成了这样：
+
+`PATCH /articles/123OR1=1`
+
+```sql
+UPDATE users SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123 OR 1 = 1;
+```
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 255px">
+
+# Blog 基本功能差不多就这样了。
+
+</div>
+
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 255px">
+
+# 那我们再花 30 分钟设计一个论坛吧。
+
+</div>
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 255px">
+
+# 怎么搞？ 😂
+
+</div>
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 255px">
+
+# Rename `Article` struct to `Topic`
+
+<br />
+
+# 搞定！ 😂
+
+</div>
+
+-----------------------------------------------------------------------
+
+<div style="text-align:center; padding-top: 255px">
+
+# Q <small>&</small> A
+
+</div>
