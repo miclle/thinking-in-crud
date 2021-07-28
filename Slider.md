@@ -1394,7 +1394,9 @@ https://domain.com/email/verify/8uvBPv1hjUP6LE4OBGvY67HCOIog46
 
 # SQL 注入（老生常谈的问题了）
 
-#### 先举个例子
+#### 先举个例子，更新文章：
+
+<br />
 
 <div style="display: block; width: 100%; height: auto; overflow: hidden">
   <div style="width: 27%; float: left; margin-right: 5px;">
@@ -1444,18 +1446,50 @@ database.Model(&comment).Where(fmt.Sprintf("id = %s", params["id"])).Update("tit
 
 ###### 预期执行：
 ```sql
-UPDATE users SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123;
+UPDATE articles SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123;
 ```
 
-###### Why?
+###### 但是，如果请求变成了这样：
 
-如果请求变成了这样：
+`PATCH /articles/123%20or%201%3D1` => `PATCH /articles/123 or 1=1`
 
-`PATCH /articles/123OR1=1`
-
+<small>此时 params["id"] 值为： id=123 or 1 = 1，拼接的 SQL 为：</small>
 ```sql
-UPDATE users SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123 OR 1 = 1;
+UPDATE articles SET title='🤖🤖🤖🤖🤖🤖', updated_at=1627290338 WHERE id=123 or 1 = 1;
+-- 所有文章的 title 都变成了 🤖🤖🤖🤖🤖🤖
 ```
+
+###### <span style="color:green">Good case</span>
+
+```go
+database.Model(&comment).Where("id = ?", params["id"]).Update("title", "🤖🤖🤖🤖🤖🤖")
+```
+
+###### 使用参数占位符，内容会被转义
+
+-----------------------------------------------------------------------
+
+### SQL 注入会发生在任何地方
+
+```go
+db.Select("name; drop table users;").First(&user)
+
+db.Distinct("name; drop table users;").First(&user)
+
+db.Model(&user).Pluck("name; drop table users;", &names)
+
+db.Group("name; drop table users;").First(&user)
+
+db.Group("name").Having("1 = 1;drop table users;").First(&user)
+
+db.Raw("select name from users; drop table users;").First(&user)
+
+db.Exec("select name from users; drop table users;")
+
+db.Order("name; drop table users;").First(&user)
+```
+
+https://gorm.io/zh_CN/docs/security.html#SQL-%E6%B3%A8%E5%85%A5%E6%96%B9%E6%B3%95
 
 -----------------------------------------------------------------------
 
